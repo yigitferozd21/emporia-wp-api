@@ -16,28 +16,19 @@ const client = new Client({
     }
 });
 
-// QR Kod Üretildiğinde Konsola Yazdır
 client.on('qr', (qr) => {
     console.log('\n--- BARKOD OLUŞTURULDU ---');
-    console.log('Lütfen telefonunuzdan WhatsApp Web\'i açıp şu QR kodu okutun:');
     qrcode.generate(qr, { small: true });
 });
 
-// Bağlantı Başarılı Olduğunda
 client.on('ready', () => {
-    console.log('\n✅ BAĞLANTI BAŞARILI! WhatsApp motoru bulutta 7/24 çalışıyor.');
+    console.log('\n✅ BAĞLANTI BAŞARILI!');
 });
 
-// Bağlantı Koptuğunda Otomatik Yeniden Başlatma/Log
-client.on('disconnected', (reason) => {
-    console.log('\n❌ BAĞLANTI KOPTU:', reason);
-});
-
-// İstemciyi Aktif Et
 client.initialize();
 
-// Vercel / v0'dan Gelen İstekleri Doğrudan İşleyen Uç Nokta
-app.post('/api/whatsapp', async (req, res) => {
+// Ortak mesaj gönderme fonksiyonu (Her iki adres için de çalışır)
+const handleSendMessage = async (req, res) => {
     const { phone, message } = req.body;
     
     if (!phone || !message) {
@@ -45,7 +36,6 @@ app.post('/api/whatsapp', async (req, res) => {
     }
 
     try {
-        // Numarayı WhatsApp formatına çevir (örn: 90532xxxxxxx@c.us)
         const formattedPhone = phone.replace(/\D/g, ''); 
         const chatId = `${formattedPhone}@c.us`;
 
@@ -57,9 +47,12 @@ app.post('/api/whatsapp', async (req, res) => {
         console.error('[HATA] Mesaj gönderilemedi:', error);
         return res.status(500).json({ success: false, error: error.toString() });
     }
-});
+};
 
-// Render Port Ayarı
+// v0 hangi adrese istek atarsa atsın buraya düşecek:
+app.post('/api/whatsapp', handleSendMessage);
+app.post('/send-message', handleSendMessage);
+
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
     console.log(`Sunucu port ${PORT} üzerinde dinleniyor...`);
