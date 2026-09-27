@@ -7,9 +7,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-let isReady = false;
-
-// 1. Önce client nesnesini tanımlıyoruz
+// WhatsApp İstemcisini Başlatıyoruz
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: { 
@@ -18,39 +16,36 @@ const client = new Client({
     }
 });
 
-// 2. Sonra olayları (events) dinliyoruz
+// QR Kod Üretildiğinde Konsola Yazdır
 client.on('qr', (qr) => {
     console.log('\n--- BARKOD OLUŞTURULDU ---');
     console.log('Lütfen telefonunuzdan WhatsApp Web\'i açıp şu QR kodu okutun:');
     qrcode.generate(qr, { small: true });
 });
 
+// Bağlantı Başarılı Olduğunda
 client.on('ready', () => {
-    isReady = true;
     console.log('\n✅ BAĞLANTI BAŞARILI! WhatsApp motoru bulutta 7/24 çalışıyor.');
 });
 
-client.on('disconnected', () => {
-    isReady = false;
-    console.log('\n❌ BAĞLANTI KOPTU!');
+// Bağlantı Koptuğunda Otomatik Yeniden Başlatma/Log
+client.on('disconnected', (reason) => {
+    console.log('\n❌ BAĞLANTI KOPTU:', reason);
 });
 
-// 3. Client'ı başlatıyoruz
+// İstemciyi Aktif Et
 client.initialize();
 
-// 4. API Endpoint
+// Vercel / v0'dan Gelen İstekleri Doğrudan İşleyen Uç Nokta
 app.post('/api/whatsapp', async (req, res) => {
-    if (!isReady) {
-        return res.status(503).json({ success: false, error: 'WhatsApp istemcisi henüz hazır değil, lütfen birkaç saniye bekleyin.' });
-    }
-
     const { phone, message } = req.body;
     
-    try {
-        if (!phone || !message) {
-            return res.status(400).json({ success: false, error: 'Telefon ve mesaj alanları zorunludur.' });
-        }
+    if (!phone || !message) {
+        return res.status(400).json({ success: false, error: 'Telefon ve mesaj alanları zorunludur.' });
+    }
 
+    try {
+        // Numarayı WhatsApp formatına çevir (örn: 90532xxxxxxx@c.us)
         const formattedPhone = phone.replace(/\D/g, ''); 
         const chatId = `${formattedPhone}@c.us`;
 
@@ -64,6 +59,7 @@ app.post('/api/whatsapp', async (req, res) => {
     }
 });
 
+// Render Port Ayarı
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
     console.log(`Sunucu port ${PORT} üzerinde dinleniyor...`);
