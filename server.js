@@ -7,7 +7,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// WhatsApp İstemcisini Başlatıyoruz
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: { 
@@ -16,19 +15,38 @@ const client = new Client({
     }
 });
 
+let isClientReady = false;
+
 client.on('qr', (qr) => {
     console.log('\n--- BARKOD OLUŞTURULDU ---');
     qrcode.generate(qr, { small: true });
 });
 
 client.on('ready', () => {
+    isClientReady = true;
     console.log('\n✅ BAĞLANTI BAŞARILI!');
+});
+
+client.on('authenticated', () => {
+    console.log('\n🔐 Oturum açıldı!');
+});
+
+client.on('disconnected', (reason) => {
+    isClientReady = false;
+    console.log('\n❌ Bağlantı koptu:', reason);
 });
 
 client.initialize();
 
-// Ortak mesaj gönderme fonksiyonu (Her iki adres için de çalışır)
 const handleSendMessage = async (req, res) => {
+    // İstemci veya arka plandaki tarayıcı sayfası hazır değilse getChat hatasına girmeden engelle
+    if (!isClientReady || !client.pupPage) {
+        return res.status(503).json({ 
+            success: false, 
+            error: 'WhatsApp motoru henüz tam hazır değil. Lütfen birkaç saniye bekleyin.' 
+        });
+    }
+
     const { phone, message } = req.body;
     
     if (!phone || !message) {
@@ -49,7 +67,6 @@ const handleSendMessage = async (req, res) => {
     }
 };
 
-// v0 hangi adrese istek atarsa atsın buraya düşecek:
 app.post('/api/whatsapp', handleSendMessage);
 app.post('/send-message', handleSendMessage);
 
